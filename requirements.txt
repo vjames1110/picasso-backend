@@ -8,3 +8,5 @@ alembic
 passlib
 python-multipart
 pydantic[email]
+email-validator
+python-jose[cryptography]
