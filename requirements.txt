@@ -7,3 +7,4 @@ pydantic
 alembic
 passlib
 python-multipart
+pydantic[email]
