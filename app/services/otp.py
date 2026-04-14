@@ -39,7 +39,7 @@ def send_email_otp(email: str, otp: str):
             "Content-Type": "application/json",
         },
         json={
-            "from": "Picasso <onboarding@resend.dev>",
+            "from": "Picasso Publications <picasso.india10@gmail.com>",
             "to": [email],
             "subject": "Picasso OTP Verification",
             "html": f"""
