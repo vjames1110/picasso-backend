@@ -12,8 +12,10 @@ class Order(Base):
 
     user_id = Column(Integer, ForeignKey("users.id"))
     total_amount = Column(Float)
+    razorpay_order_id = Column(String)
     payment_id = Column(String, nullable=True)
     status = Column(String, default="created")
+
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
