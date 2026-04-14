@@ -10,6 +10,38 @@ BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 
 
 def send_email_otp(email: str, otp: str):
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
+            },
+            json={
+                "sender": {
+                    "name": "Picasso Publications",
+                    "email": "picasso.india10@gmail.com"
+                },
+                "to": [
+                    {
+                        "email": email
+                    }
+                ],
+                "subject": "Your OTP - Picasso Publications",
+                "htmlContent": f"""
+                    <h2>Picasso Publications</h2>
+                    <h1>{otp}</h1>
+                    <p>This OTP is valid for 5 minutes.</p>
+                """
+            }
+        )
+
+        print("BREVO STATUS:", response.status_code)
+        print("BREVO RESPONSE:", response.text)
+
+    except Exception as e:
+        print("BREVO ERROR:", e)
 
     def send():
         try:
