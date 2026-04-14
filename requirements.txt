@@ -11,3 +11,4 @@ pydantic[email]
 email-validator
 python-jose[cryptography]
 requests
+razorpay
