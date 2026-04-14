@@ -1,24 +1,33 @@
 import random
-import smtplib
-from email.mime.text import MIMEText
+import os
+import requests
 
 # temporary in-memory store (upgrade to Redis later)
 OTP_STORE = {}
 
-EMAIL_SENDER = "vikashjames8@gmail.com"
-EMAIL_PASSWORD = "mjpa wtns rfxd mbps"  # Gmail App Password only
+RESEND_API_KEY = os.getenv("re_AMNpx8uc_JN7oDvsYZJ58B933i8XS2St6")
 
 
 def send_email_otp(email: str, otp: str):
-    msg = MIMEText(f"Your OTP for Picasso Bookstore is: {otp}")
-    msg["Subject"] = "Picasso OTP Verification"
-    msg["From"] = EMAIL_SENDER
-    msg["To"] = email
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_SENDER, email, msg.as_string())
+    requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": "Picasso <onboarding@resend.dev>",
+            "to": [email],
+            "subject": "Picasso OTP Verification",
+            "html": f"""
+                <h2>Picasso Publications</h2>
+                <p>Your OTP is:</p>
+                <h1>{otp}</h1>
+                <p>This OTP is valid for 5 minutes.</p>
+            """,
+        },
+    )
 
 
 def generate_otp(email: str):
