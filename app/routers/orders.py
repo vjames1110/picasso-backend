@@ -76,12 +76,15 @@ def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    order = db.query(Order).filter(Order.id == payload["order_id"]).first()
+    # find using razorpay_order_id
+    order = db.query(Order).filter(
+        Order.razorpay_order_id == payload["razorpay_order_id"]
+    ).first()
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    order.status = "paid"
+    order.status = "completed"
     order.payment_id = payload["razorpay_payment_id"]
 
     db.commit()
