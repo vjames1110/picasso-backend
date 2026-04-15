@@ -93,3 +93,41 @@ def verify_payment(
         "message": "Payment successful",
         "order_id": order.id
     }
+
+# Order history
+
+# ---------------- MY ORDERS ----------------
+@router.get("/my-orders")
+def get_my_orders(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    orders = (
+        db.query(Order)
+        .filter(Order.user_id == user.id)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for order in orders:
+        result.append({
+            "id": order.id,
+            "status": order.status,
+            "total_amount": order.total_amount,
+            "payment_id": order.payment_id,
+            "razorpay_order_id": order.razorpay_order_id,
+            "created_at": order.created_at,
+            "items": [
+                {
+                    "title": item.title,
+                    "price": item.price,
+                    "quantity": item.quantity,
+                    "book_id": item.book_id
+                }
+                for item in order.items
+            ]
+        })
+
+    return result
