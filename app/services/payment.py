@@ -6,12 +6,18 @@ import hashlib
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+print("RAZORPAY_KEY_ID:", RAZORPAY_KEY_ID)
+print("RAZORPAY_KEY_SECRET:", "SET" if RAZORPAY_KEY_SECRET else "MISSING")
+
 
 
 # ---------------- CREATE ORDER ----------------
 def create_razorpay_order(amount: int, receipt_id: str):
 
+    client = razorpay.Client(
+        auth=(os.getenv("RAZORPAY_KEY_ID"), 
+              os.getenv("RAZORPAY_KEY_SECRET")))
+    
     order = client.order.create({
         "amount": amount * 100,  # paise
         "currency": "INR",
