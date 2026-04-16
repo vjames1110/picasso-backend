@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 
 from app.core.database import get_db
@@ -35,7 +35,6 @@ def create_order(
 
     for item in data.items:
 
-        # validate book exists
         book = db.query(Book).filter(Book.id == item.book_id).first()
 
         if not book:
@@ -57,9 +56,10 @@ def create_order(
     db.add_all(items)
     db.commit()
 
-    # refresh after items
+    # IMPORTANT refresh order AFTER items
     db.refresh(order)
 
+    # create razorpay order
     razorpay_order = create_razorpay_order(
         amount=int(data.amount),
         receipt_id=str(order.id)
@@ -108,6 +108,7 @@ def verify_payment(
         order.confirmed_at = datetime.utcnow()
 
     db.commit()
+    db.refresh(order)
 
     return {
         "message": "Payment successful",
@@ -123,6 +124,7 @@ def get_my_orders(
 ):
     orders = (
         db.query(Order)
+        .options(joinedload(Order.items))   # IMPORTANT FIX
         .filter(Order.user_id == user.id)
         .order_by(Order.created_at.desc())
         .all()
@@ -138,6 +140,10 @@ def get_my_orders(
             "payment_id": order.payment_id,
             "razorpay_order_id": order.razorpay_order_id,
             "created_at": order.created_at,
+            "confirmed_at": order.confirmed_at,
+            "packed_at": order.packed_at,
+            "shipped_at": order.shipped_at,
+            "delivered_at": order.delivered_at,
             "items": [
                 {
                     "title": item.title,
@@ -161,6 +167,7 @@ def get_order(
 ):
     order = (
         db.query(Order)
+        .options(joinedload(Order.items))   # IMPORTANT FIX
         .filter(
             Order.id == order_id,
             Order.user_id == user.id
