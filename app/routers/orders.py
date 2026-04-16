@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.services.payment import create_razorpay_order, verify_payment_signature
 from app.services.deps import get_current_user
 from app.models.order import Order, OrderItem
+from app.models.book import Book
 from app.schemas.order import OrderCreate
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -29,10 +30,20 @@ def create_order(
     db.commit()
     db.refresh(order)
 
-    # create items
+    # create items safely
     items = []
 
     for item in data.items:
+
+        # validate book exists
+        book = db.query(Book).filter(Book.id == item.book_id).first()
+
+        if not book:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Book with id {item.book_id} not found"
+            )
+
         items.append(
             OrderItem(
                 order_id=order.id,
@@ -46,7 +57,7 @@ def create_order(
     db.add_all(items)
     db.commit()
 
-    # IMPORTANT refresh after items
+    # refresh after items
     db.refresh(order)
 
     razorpay_order = create_razorpay_order(
@@ -83,7 +94,6 @@ def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    # find using razorpay_order_id
     order = db.query(Order).filter(
         Order.razorpay_order_id == payload["razorpay_order_id"]
     ).first()
@@ -104,7 +114,6 @@ def verify_payment(
         "order_id": order.id
     }
 
-# Order history
 
 # ---------------- MY ORDERS ----------------
 @router.get("/my-orders")
@@ -142,7 +151,6 @@ def get_my_orders(
 
     return result
 
-# Get Single Order
 
 # ---------------- GET SINGLE ORDER ----------------
 @router.get("/{order_id}")
@@ -153,7 +161,10 @@ def get_order(
 ):
     order = (
         db.query(Order)
-        .filter(Order.id == order_id)
+        .filter(
+            Order.id == order_id,
+            Order.user_id == user.id
+        )
         .first()
     )
 
@@ -180,9 +191,8 @@ def get_order(
         ]
     }
 
-# Update order status Admin Only
 
-# ---------------- UPDATE ORDER STATUS (ADMIN ONLY - PHASE 1 CORE) ----------------
+# ---------------- UPDATE ORDER STATUS ----------------
 @router.put("/update-status/{order_id}")
 def update_order_status(
     order_id: int,
@@ -190,10 +200,6 @@ def update_order_status(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    """
-    Updates order status + tracking timestamps
-    Safe extension for Phase 1 tracking system
-    """
 
     order = db.query(Order).filter(Order.id == order_id).first()
 
@@ -210,27 +216,20 @@ def update_order_status(
     if new_status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    # ---------------- UPDATE STATUS ----------------
     order.status = new_status
-
     now = datetime.utcnow()
 
-    # ---------------- AUTO TIMESTAMP HANDLING ----------------
-    if new_status == "confirmed":
-        if not order.confirmed_at:
-            order.confirmed_at = now
+    if new_status == "confirmed" and not order.confirmed_at:
+        order.confirmed_at = now
 
-    elif new_status == "packed":
-        if not order.packed_at:
-            order.packed_at = now
+    elif new_status == "packed" and not order.packed_at:
+        order.packed_at = now
 
-    elif new_status == "shipped":
-        if not order.shipped_at:
-            order.shipped_at = now
+    elif new_status == "shipped" and not order.shipped_at:
+        order.shipped_at = now
 
-    elif new_status == "delivered":
-        if not order.delivered_at:
-            order.delivered_at = now
+    elif new_status == "delivered" and not order.delivered_at:
+        order.delivered_at = now
 
     db.commit()
     db.refresh(order)
