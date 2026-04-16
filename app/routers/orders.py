@@ -85,8 +85,11 @@ def verify_payment(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    order.status = "completed"
+    order.status = "confirmed"
     order.payment_id = payload["razorpay_payment_id"]
+
+    if not order.confirmed_at:
+        order.confirmed_at = datetime.utcnow()
 
     db.commit()
 
