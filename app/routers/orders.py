@@ -19,7 +19,6 @@ def create_order(
     user=Depends(get_current_user)
 ):
 
-    # 1. Save order in DB
     order = Order(
         user_id=user.id,
         total_amount=data.amount,
@@ -30,35 +29,34 @@ def create_order(
     db.commit()
     db.refresh(order)
 
-    # 2. Save items (IMPORTANT FIX)
+    # create items
     items = []
 
     for item in data.items:
-        order_item = OrderItem(
-            order_id=order.id,
-            book_id=item.book_id,
-            title=item.title,
-            quantity=item.quantity,
-            price=item.price
+        items.append(
+            OrderItem(
+                order_id=order.id,
+                book_id=item.book_id,
+                title=item.title,
+                quantity=item.quantity,
+                price=item.price
+            )
         )
-
-        items.append(order_item)
-
-    order.items = items   # ← IMPORTANT LINE
 
     db.add_all(items)
     db.commit()
+
+    # IMPORTANT refresh after items
     db.refresh(order)
 
-    # 3. Create Razorpay order
     razorpay_order = create_razorpay_order(
         amount=int(data.amount),
         receipt_id=str(order.id)
     )
 
-    # 4. Save razorpay order id in DB
     order.razorpay_order_id = razorpay_order["id"]
     db.commit()
+    db.refresh(order)
 
     return {
         "order_id": order.id,
@@ -155,10 +153,7 @@ def get_order(
 ):
     order = (
         db.query(Order)
-        .filter(
-            Order.id == order_id,
-            Order.user_id == user.id
-        )
+        .filter(Order.id == order_id)
         .first()
     )
 
@@ -171,12 +166,10 @@ def get_order(
         "total_amount": order.total_amount,
         "payment_id": order.payment_id,
         "created_at": order.created_at,
-
         "confirmed_at": order.confirmed_at,
         "packed_at": order.packed_at,
         "shipped_at": order.shipped_at,
         "delivered_at": order.delivered_at,
-
         "items": [
             {
                 "title": item.title,
@@ -188,9 +181,6 @@ def get_order(
     }
 
 # Update order status Admin Only
-
-from datetime import datetime
-
 
 # ---------------- UPDATE ORDER STATUS (ADMIN ONLY - PHASE 1 CORE) ----------------
 @router.put("/update-status/{order_id}")
