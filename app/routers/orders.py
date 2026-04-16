@@ -31,9 +31,16 @@ def create_order(
     db.refresh(order)
 
     # create items safely
+    seen = set()
     items = []
 
     for item in data.items:
+        key = (item.book_id)
+
+        if key in seen:
+            continue
+
+        seen.add(key)
 
         book = db.query(Book).filter(Book.id == item.book_id).first()
 
