@@ -19,6 +19,11 @@ class Order(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    confirmed_at = Column(DateTime, nullable=True)
+    packed_at = Column(DateTime, nullable=True)
+    shipped_at = Column(DateTime, nullable=True)
+    deliverd_at = Column(DateTime, nullable=True)
+
     items = relationship("OrderItem", back_populates="order")
 
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.core.database import get_db
 from app.services.payment import create_razorpay_order, verify_payment_signature
@@ -167,4 +168,72 @@ def get_order(
             }
             for item in order.items
         ]
+    }
+
+# Update order status Admin Only
+
+from datetime import datetime
+
+
+# ---------------- UPDATE ORDER STATUS (ADMIN ONLY - PHASE 1 CORE) ----------------
+@router.put("/update-status/{order_id}")
+def update_order_status(
+    order_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    """
+    Updates order status + tracking timestamps
+    Safe extension for Phase 1 tracking system
+    """
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    new_status = payload.get("status")
+
+    if not new_status:
+        raise HTTPException(status_code=400, detail="Status is required")
+
+    valid_statuses = ["pending", "confirmed", "packed", "shipped", "delivered"]
+
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    # ---------------- UPDATE STATUS ----------------
+    order.status = new_status
+
+    now = datetime.utcnow()
+
+    # ---------------- AUTO TIMESTAMP HANDLING ----------------
+    if new_status == "confirmed":
+        if not order.confirmed_at:
+            order.confirmed_at = now
+
+    elif new_status == "packed":
+        if not order.packed_at:
+            order.packed_at = now
+
+    elif new_status == "shipped":
+        if not order.shipped_at:
+            order.shipped_at = now
+
+    elif new_status == "delivered":
+        if not order.delivered_at:
+            order.delivered_at = now
+
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "message": "Order status updated successfully",
+        "order_id": order.id,
+        "status": order.status,
+        "confirmed_at": order.confirmed_at,
+        "packed_at": order.packed_at,
+        "shipped_at": order.shipped_at,
+        "delivered_at": order.delivered_at
     }
