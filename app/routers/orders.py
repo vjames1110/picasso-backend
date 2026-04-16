@@ -30,17 +30,25 @@ def create_order(
     db.commit()
     db.refresh(order)
 
-    # 2. Save items
+    # 2. Save items (IMPORTANT FIX)
+    items = []
+
     for item in data.items:
-        db.add(OrderItem(
+        order_item = OrderItem(
             order_id=order.id,
             book_id=item.book_id,
             title=item.title,
             quantity=item.quantity,
             price=item.price
-        ))
+        )
 
+        items.append(order_item)
+
+    order.items = items   # ← IMPORTANT LINE
+
+    db.add_all(items)
     db.commit()
+    db.refresh(order)
 
     # 3. Create Razorpay order
     razorpay_order = create_razorpay_order(
@@ -163,6 +171,12 @@ def get_order(
         "total_amount": order.total_amount,
         "payment_id": order.payment_id,
         "created_at": order.created_at,
+
+        "confirmed_at": order.confirmed_at,
+        "packed_at": order.packed_at,
+        "shipped_at": order.shipped_at,
+        "delivered_at": order.delivered_at,
+
         "items": [
             {
                 "title": item.title,
