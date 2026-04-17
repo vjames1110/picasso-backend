@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, books, cart, wishlist, orders
+from app.routers import auth, books, cart, wishlist, orders, admin_dashboard
 
 app = FastAPI()
 
@@ -22,5 +22,10 @@ app.include_router(books.router)
 app.include_router(cart.router)
 app.include_router(wishlist.router)
 app.include_router(orders.router)
+app.include_router(
+    admin_dashboard.router,
+    prefix="/admin",
+    tags=["Admin Dashboard"]
+)
 
 Base.metadata.create_all(bind=engine)
