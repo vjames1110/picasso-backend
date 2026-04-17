@@ -4,7 +4,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.services.payment import create_razorpay_order, verify_payment_signature
-from app.services.deps import get_current_user
+from app.services.deps import get_current_user, get_current_admin_user
 from app.models.order import Order, OrderItem
 from app.models.book import Book
 from app.schemas.order import OrderCreate
@@ -168,7 +168,7 @@ def get_my_orders(
 @router.get("/admin/all")
 def get_all_orders(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)    
+    user=Depends(get_current_admin_user)    
 ):
     orders = (
         db.query(Order)
