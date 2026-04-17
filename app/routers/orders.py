@@ -165,6 +165,44 @@ def get_my_orders(
     return result
 
 
+@router.get("/admin/all")
+def get_all_orders(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)    
+):
+    orders = (
+        db.query(Order)
+        .options(joinedload(Order.items))
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for order in orders:
+        result.append({
+            "id": order.id,
+            "status": order.status,
+            "total_amount": order.total_amount,
+            "payment_id": order.payment_id,
+            "created_at": order.created_at,
+            "confirmed_at": order.confirmed_at,
+            "packed_at": order.packed_at,
+            "shipped_at": order.shipped_at,
+            "delivered_at": order.delivered_at,
+            "items": [
+                {
+                    "title": item.title,
+                    "price": item.price,
+                    "quantity": item.quantity
+               }
+               for item in order.items
+            ]
+        })
+
+        return result
+
+
 # ---------------- GET SINGLE ORDER ----------------
 @router.get("/{order_id}")
 def get_order(
