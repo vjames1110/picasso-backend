@@ -222,6 +222,41 @@ def get_all_orders(
 
     return result
 
+@router.put("/update-status/{order_id}")
+def update_order_status(
+    order_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin_user)
+):
+    order = db.query(Order).filter(Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    status = payload.get("status")
+
+    order.status = status
+
+    from datetime import datetime
+
+    if status == "confirmed":
+        order.confirmed_at = datetime.utcnow()
+
+    elif status == "packed":
+        order.packed_at = datetime.utcnow()
+
+    elif status == "shipped":
+        order.shipped_at = datetime.utcnow()
+
+    elif status == "delivered":
+        order.delivered_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Status updated"}
+
 
 # ---------------- GET SINGLE ORDER ----------------
 @router.get("/{order_id}")

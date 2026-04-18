@@ -64,9 +64,16 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
     book = db.query(Book).filter(Book.id == book_id).first()
 
     if not book:
-        raise HTTPException(status_code=404)
-    
-    db.delete(book)
-    db.commit()
+        raise HTTPException(status_code=404, detail="Book not found")
 
-    return {"message": "Book deleted successfully"}
+    try:
+        db.delete(book)
+        db.commit()
+        return {"message": "Book deleted successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete book. It is used in orders."
+        )
