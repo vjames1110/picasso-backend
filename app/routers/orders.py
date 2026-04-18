@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, selectinload, joinedload
 from datetime import datetime
 
 from app.core.database import get_db
@@ -8,7 +8,6 @@ from app.services.deps import get_current_user, get_current_admin_user
 from app.models.order import Order, OrderItem
 from app.models.book import Book
 from app.schemas.order import OrderCreate
-from app.models.user import User
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -46,15 +45,17 @@ def create_order(
         items.append(
             OrderItem(
                 order_id=order.id,
-                book_id=book.id,          # ✅ FIXED
-                title=book.title,         # ✅ from DB
-                quantity=item.quantity,   # ✅ multi qty supported
-                price=book.price          # ✅ correct price
+                book_id=book.id,
+                title=book.title,
+                quantity=item.quantity,
+                price=book.price
             )
         )
 
     db.add_all(items)
     db.commit()
+
+    # IMPORTANT
     db.refresh(order)
 
     razorpay_order = create_razorpay_order(
@@ -114,7 +115,6 @@ def verify_payment(
 
 
 # ---------------- MY ORDERS ----------------
-# ---------------- MY ORDERS ----------------
 @router.get("/my-orders")
 def get_my_orders(
     db: Session = Depends(get_db),
@@ -131,6 +131,18 @@ def get_my_orders(
     result = []
 
     for order in orders:
+
+        items = [
+            {
+                "book_id": item.book_id,
+                "title": item.title,
+                "price": item.price,
+                "quantity": item.quantity
+            }
+            for item in order.items
+            if item.order_id == order.id   # CRITICAL FIX
+        ]
+
         result.append({
             "id": order.id,
             "status": order.status,
@@ -141,19 +153,13 @@ def get_my_orders(
             "packed_at": order.packed_at,
             "shipped_at": order.shipped_at,
             "delivered_at": order.delivered_at,
-            "items": [
-                {
-                    "book_id": item.book_id,
-                    "title": item.title,
-                    "price": item.price,
-                    "quantity": item.quantity
-                }
-                for item in order.items
-            ]
+            "items": items
         })
 
     return result
 
+
+# ---------------- ADMIN ALL ORDERS ----------------
 @router.get("/admin/all")
 def get_all_orders(
     db: Session = Depends(get_db),
@@ -163,7 +169,8 @@ def get_all_orders(
         db.query(Order)
         .options(
             selectinload(Order.items),
-            joinedload(Order.user))
+            joinedload(Order.user)
+        )
         .order_by(Order.created_at.desc())
         .all()
     )
@@ -171,6 +178,18 @@ def get_all_orders(
     result = []
 
     for order in orders:
+
+        items = [
+            {
+                "book_id": item.book_id,
+                "title": item.title,
+                "price": item.price,
+                "quantity": item.quantity
+            }
+            for item in order.items
+            if item.order_id == order.id   # CRITICAL FIX
+        ]
+
         result.append({
             "id": order.id,
             "status": order.status,
@@ -191,16 +210,7 @@ def get_all_orders(
                 "city": order.user.city,
                 "state": order.user.state
             },
-
-            "items": [
-                {
-                    "book_id": item.book_id,
-                    "title": item.title,
-                    "price": item.price,
-                    "quantity": item.quantity
-                }
-                for item in order.items
-            ]
+            "items": items
         })
 
     return result
@@ -215,7 +225,7 @@ def get_order(
 ):
     order = (
         db.query(Order)
-        .options(joinedload(Order.items))   # IMPORTANT FIX
+        .options(selectinload(Order.items))
         .filter(
             Order.id == order_id,
             Order.user_id == user.id
@@ -225,6 +235,17 @@ def get_order(
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    items = [
+        {
+            "book_id": item.book_id,
+            "title": item.title,
+            "price": item.price,
+            "quantity": item.quantity
+        }
+        for item in order.items
+        if item.order_id == order.id   # CRITICAL FIX
+    ]
 
     return {
         "id": order.id,
@@ -236,66 +257,5 @@ def get_order(
         "packed_at": order.packed_at,
         "shipped_at": order.shipped_at,
         "delivered_at": order.delivered_at,
-        "items": [
-            {
-                "book_id": item.book_id,
-                "title": item.title,
-                "price": item.price,
-                "quantity": item.quantity
-            }
-            for item in order.items
-        ]
-    }
-
-
-# ---------------- UPDATE ORDER STATUS ----------------
-@router.put("/update-status/{order_id}")
-def update_order_status(
-    order_id: int,
-    payload: dict,
-    db: Session = Depends(get_db),
-    user=Depends(get_current_admin_user)
-):
-
-    order = db.query(Order).filter(Order.id == order_id).first()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    new_status = payload.get("status")
-
-    if not new_status:
-        raise HTTPException(status_code=400, detail="Status is required")
-
-    valid_statuses = ["pending", "confirmed", "packed", "shipped", "delivered"]
-
-    if new_status not in valid_statuses:
-        raise HTTPException(status_code=400, detail="Invalid status")
-
-    order.status = new_status
-    now = datetime.utcnow()
-
-    if new_status == "confirmed" and not order.confirmed_at:
-        order.confirmed_at = now
-
-    elif new_status == "packed" and not order.packed_at:
-        order.packed_at = now
-
-    elif new_status == "shipped" and not order.shipped_at:
-        order.shipped_at = now
-
-    elif new_status == "delivered" and not order.delivered_at:
-        order.delivered_at = now
-
-    db.commit()
-    db.refresh(order)
-
-    return {
-        "message": "Order status updated successfully",
-        "order_id": order.id,
-        "status": order.status,
-        "confirmed_at": order.confirmed_at,
-        "packed_at": order.packed_at,
-        "shipped_at": order.shipped_at,
-        "delivered_at": order.delivered_at
+        "items": items
     }
