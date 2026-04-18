@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from app.core.database import Base
+from app.models.user import User
 
 
 class Order(Base):
@@ -25,6 +26,7 @@ class Order(Base):
     delivered_at = Column(DateTime, nullable=True)
 
     items = relationship("OrderItem", back_populates="order")
+    user = relationship("User")
 
 
 class OrderItem(Base):

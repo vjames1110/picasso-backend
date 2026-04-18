@@ -8,6 +8,7 @@ from app.services.deps import get_current_user, get_current_admin_user
 from app.models.order import Order, OrderItem
 from app.models.book import Book
 from app.schemas.order import OrderCreate
+from app.models.user import User
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -124,15 +125,16 @@ def verify_payment(
 
 
 # ---------------- MY ORDERS ----------------
-@router.get("/my-orders")
-def get_my_orders(
+@router.get("/admin/all")
+def get_all_orders(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(get_current_admin_user)
 ):
     orders = (
         db.query(Order)
-        .options(joinedload(Order.items))   # IMPORTANT FIX
-        .filter(Order.user_id == user.id)
+        .options(
+            joinedload(Order.items),
+            joinedload(Order.user))
         .order_by(Order.created_at.desc())
         .all()
     )
@@ -145,62 +147,33 @@ def get_my_orders(
             "status": order.status,
             "total_amount": order.total_amount,
             "payment_id": order.payment_id,
-            "razorpay_order_id": order.razorpay_order_id,
             "created_at": order.created_at,
             "confirmed_at": order.confirmed_at,
             "packed_at": order.packed_at,
             "shipped_at": order.shipped_at,
             "delivered_at": order.delivered_at,
+            "user": {
+                "name": order.user.name,
+                "email": order.user.email,
+                "phone": order.user.phone,
+                "pincode": order.user.pincode,
+                "house": order.user.house,
+                "area": order.user.area,
+                "city": order.user.city,
+                "state": order.user.state
+            },
+            
             "items": [
                 {
                     "title": item.title,
                     "price": item.price,
-                    "quantity": item.quantity,
-                    "book_id": item.book_id
+                    "quantity": item.quantity
                 }
                 for item in order.items
             ]
         })
 
     return result
-
-
-@router.get("/admin/all")
-def get_all_orders(
-    db: Session = Depends(get_db),
-    user=Depends(get_current_admin_user)    
-):
-    orders = (
-        db.query(Order)
-        .options(joinedload(Order.items))
-        .order_by(Order.created_at.desc())
-        .all()
-    )
-
-    result = []
-
-    for order in orders:
-        result.append({
-            "id": order.id,
-            "status": order.status,
-            "total_amount": order.total_amount,
-            "payment_id": order.payment_id,
-            "created_at": order.created_at,
-            "confirmed_at": order.confirmed_at,
-            "packed_at": order.packed_at,
-            "shipped_at": order.shipped_at,
-            "delivered_at": order.delivered_at,
-            "items": [
-                {
-                    "title": item.title,
-                    "price": item.price,
-                    "quantity": item.quantity
-               }
-               for item in order.items
-            ]
-        })
-
-        return result
 
 
 # ---------------- GET SINGLE ORDER ----------------
