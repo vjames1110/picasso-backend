@@ -31,17 +31,9 @@ def create_order(
     db.commit()
     db.refresh(order)
 
-    # create items safely
-    seen = set()
     items = []
 
     for item in data.items:
-        key = (item.book_id)
-
-        if key in seen:
-            continue
-
-        seen.add(key)
 
         book = db.query(Book).filter(Book.id == item.book_id).first()
 
@@ -54,20 +46,17 @@ def create_order(
         items.append(
             OrderItem(
                 order_id=order.id,
-                book_id=item.book_id,
-                title=item.title,
-                quantity=item.quantity,
-                price=item.price
+                book_id=book.id,          # ✅ FIXED
+                title=book.title,         # ✅ from DB
+                quantity=item.quantity,   # ✅ multi qty supported
+                price=book.price          # ✅ correct price
             )
         )
 
     db.add_all(items)
     db.commit()
-
-    # IMPORTANT refresh order AFTER items
     db.refresh(order)
 
-    # create razorpay order
     razorpay_order = create_razorpay_order(
         amount=int(data.amount),
         receipt_id=str(order.id)
