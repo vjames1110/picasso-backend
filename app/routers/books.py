@@ -10,6 +10,7 @@ router = APIRouter(prefix="/books", tags=["books"])
 
 # Create Book
 
+@router.post("", response_model=BookResponse)
 @router.post("/", response_model=BookResponse)
 def create_book(data: BookCreate, db: Session = Depends(get_db)):
 
