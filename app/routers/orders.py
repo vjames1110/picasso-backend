@@ -154,6 +154,7 @@ def get_all_orders(
 
             "items": [
                 {
+                    "book_id": item.book_id,
                     "title": item.title,
                     "price": item.price,
                     "quantity": item.quantity
