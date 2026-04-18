@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from datetime import datetime
 
 from app.core.database import get_db
@@ -133,7 +133,7 @@ def get_all_orders(
     orders = (
         db.query(Order)
         .options(
-            joinedload(Order.items),
+            selectinload(Order.items),
             joinedload(Order.user))
         .order_by(Order.created_at.desc())
         .all()
@@ -162,7 +162,7 @@ def get_all_orders(
                 "city": order.user.city,
                 "state": order.user.state
             },
-            
+
             "items": [
                 {
                     "title": item.title,
@@ -223,7 +223,7 @@ def update_order_status(
     order_id: int,
     payload: dict,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(get_current_admin_user)
 ):
 
     order = db.query(Order).filter(Order.id == order_id).first()
