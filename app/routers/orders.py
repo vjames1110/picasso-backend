@@ -8,6 +8,7 @@ from app.services.deps import get_current_user, get_current_admin_user
 from app.models.order import Order, OrderItem
 from app.models.book import Book
 from app.schemas.order import OrderCreate
+from app.services.whatsapp import send_admin_new_order, send_user_order_confirmed
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -29,6 +30,7 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+    send_admin_new_order(order.id, data.amount)
 
     items = []
 
@@ -92,7 +94,7 @@ def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    order = db.query(Order).filter(
+    order = db.query(Order).options(joinedload(Order.user)).filter(
         Order.razorpay_order_id == payload["razorpay_order_id"]
     ).first()
 
@@ -107,6 +109,11 @@ def verify_payment(
 
     db.commit()
     db.refresh(order)
+
+
+    user_phone = order.user.phone
+
+    send_user_order_confirmed(user_phone, order.id)
 
     return {
         "message": "Payment successful",
