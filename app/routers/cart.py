@@ -126,8 +126,14 @@ def remove_cart(cart_id: int,
                 db: Session = Depends(get_db),
                 user = Depends(get_current_user)):
 
-    item = db.query(Cart).filter(Cart.id == cart_id,
-                                 Cart.user_id == user.id).first()
+    item = db.query(Cart).filter(
+        Cart.id == cart_id,
+        Cart.user_id == user.id
+    ).first()
+
+    # ---- FIX: prevent None delete crash ----
+    if not item:
+        return {"message": "Item already removed"}
 
     db.delete(item)
     db.commit()
