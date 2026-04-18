@@ -238,7 +238,7 @@ def get_order(
         "delivered_at": order.delivered_at,
         "items": [
             {
-                "book_id": item.book_id
+                "book_id": item.book_id,
                 "title": item.title,
                 "price": item.price,
                 "quantity": item.quantity
