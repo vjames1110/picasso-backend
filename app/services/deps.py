@@ -32,7 +32,7 @@ def get_current_user(
     return user
 
 
-ADMIN_EMAILS = ["vikashjames8@gmail.com"]
+ADMIN_EMAILS = ["vikashjames8@gmail.com", "picasso.india10@gmail.com"]
 
 
 def get_current_admin_user(current_user=Depends(get_current_user)):
