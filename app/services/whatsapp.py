@@ -5,10 +5,8 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
 ADMIN_PHONE = os.getenv("ADMIN_PHONE")
 
-def send_whatsapp_message(to_number: str, message: str):
-    """
-    Generic Whatsapp Sender
-    """
+
+def send_whatsapp_template(to_number: str, template_name: str, params=[]):
 
     url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
 
@@ -20,67 +18,78 @@ def send_whatsapp_message(to_number: str, message: str):
     payload = {
         "messaging_product": "whatsapp",
         "to": to_number,
-        "type": "text",
-        "text": {
-            "body": message
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {
+                "code": "en"
+            },
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": str(p)}
+                        for p in params
+                    ]
+                }
+            ]
         }
     }
 
     try:
-        requests.post(url, headers=headers, json=payload)
+        res = requests.post(url, headers=headers, json=payload)
+        print("WhatsApp Status:", res.status_code)
+        print("WhatsApp Response:", res.text)
+
     except Exception as e:
         print("Whatsapp Error:", e)
 
+
 # Admin Alert
-
 def send_admin_new_order(order_id, amount):
-    message=f"""
-📚 New Order Received
 
-Order ID: {order_id}
-Amount: ₹{amount}
+    send_whatsapp_template(
+        ADMIN_PHONE,
+        "admin_new_order",
+        [order_id, amount]
+    )
 
-Check admin dashboard.
-"""
-    send_whatsapp_message(ADMIN_PHONE, message)
 
+# User Order Confirmed
 def send_user_order_confirmed(phone, order_id):
-    message=f"""
-    ✅ Order Confirmed
 
-Order ID: {order_id}
+    send_whatsapp_template(
+        phone,
+        "order_confirmed",
+        [order_id]
+    )
 
-Your order has been confirmed.
-We will pack it shortly.
-"""
-    send_whatsapp_message(phone, message)
 
+# Packed
 def send_user_order_packed(phone, order_id):
-    message=f"""
-📦 Order Packed
 
-Order ID: {order_id}
+    send_whatsapp_template(
+        phone,
+        "order_packed",
+        [order_id]
+    )
 
-Your order has been packed.
-Will be shipped soon.
-"""
-    
+
+# Shipped
 def send_user_order_shipped(phone, order_id):
-    message=f"""
-🚚 Order Shipped
 
-Order ID: {order_id}
+    send_whatsapp_template(
+        phone,
+        "order_shipped",
+        [order_id]
+    )
 
-Your order is on the way.
-"""
-    send_whatsapp_message(phone, message)
 
+# Delivered
 def send_user_order_delivered(phone, order_id):
-    message=f"""
-🎉 Order Delivered
 
-Order ID: {order_id}
-
-Thank you for shopping with Picasso Publications.
-"""
-    send_whatsapp_message(phone, message)
+    send_whatsapp_template(
+        phone,
+        "order_delivered",
+        [order_id]
+    )
