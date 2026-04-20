@@ -17,7 +17,7 @@ def send_whatsapp_template(to_number: str, template_name: str, params=[]):
 
     payload = {
         "messaging_product": "whatsapp",
-        "to": to_number,
+        "to": str(to_number),
         "type": "template",
         "template": {
             "name": template_name,
@@ -36,60 +36,57 @@ def send_whatsapp_template(to_number: str, template_name: str, params=[]):
         }
     }
 
-    try:
-        res = requests.post(url, headers=headers, json=payload)
-        print("WhatsApp Status:", res.status_code)
-        print("WhatsApp Response:", res.text)
+    res = requests.post(url, headers=headers, json=payload)
 
-    except Exception as e:
-        print("Whatsapp Error:", e)
+    print("WhatsApp Status:", res.status_code)
+    print("WhatsApp Response:", res.text)
 
 
-# Admin Alert
-def send_admin_new_order(order_id, amount):
+# ---------------- ADMIN NEW ORDER ----------------
+def send_admin_new_order(order_id, amount, books):
 
     send_whatsapp_template(
         ADMIN_PHONE,
         "admin_new_order",
-        [order_id, amount]
+        [order_id, amount, books]
     )
 
 
-# User Order Confirmed
-def send_user_order_confirmed(phone, order_id):
+# ---------------- USER CONFIRMED ----------------
+def send_user_order_confirmed(phone, order_id, amount, books):
 
     send_whatsapp_template(
         phone,
         "order_confirmed",
-        [order_id]
+        [order_id, amount, books]
     )
 
 
-# Packed
-def send_user_order_packed(phone, order_id):
+# ---------------- USER PACKED ----------------
+def send_user_order_packed(phone, order_id, books):
 
     send_whatsapp_template(
         phone,
         "order_packed",
-        [order_id]
+        [order_id, books]
     )
 
 
-# Shipped
-def send_user_order_shipped(phone, order_id):
+# ---------------- USER SHIPPED ----------------
+def send_user_order_shipped(phone, order_id, books):
 
     send_whatsapp_template(
         phone,
         "order_shipped",
-        [order_id]
+        [order_id, books]
     )
 
 
-# Delivered
-def send_user_order_delivered(phone, order_id):
+# ---------------- USER DELIVERED ----------------
+def send_user_order_delivered(phone, order_id, books):
 
     send_whatsapp_template(
         phone,
         "order_delivered",
-        [order_id]
+        [order_id, books]
     )

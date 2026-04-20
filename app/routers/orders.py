@@ -8,7 +8,14 @@ from app.services.deps import get_current_user, get_current_admin_user
 from app.models.order import Order, OrderItem
 from app.models.book import Book
 from app.schemas.order import OrderCreate
-from app.services.whatsapp import send_admin_new_order, send_user_order_confirmed
+
+from app.services.whatsapp import (
+    send_admin_new_order,
+    send_user_order_confirmed,
+    send_user_order_shipped,
+    send_user_order_packed,
+    send_user_order_delivered
+)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -30,7 +37,6 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
-    send_admin_new_order(order.id, data.amount)
 
     items = []
 
@@ -56,9 +62,16 @@ def create_order(
 
     db.add_all(items)
     db.commit()
-
-    # IMPORTANT
     db.refresh(order)
+
+    # WhatsApp Admin Notification
+    book_titles = ", ".join([item.title for item in items])
+
+    send_admin_new_order(
+        order.id,
+        data.amount,
+        book_titles
+    )
 
     razorpay_order = create_razorpay_order(
         amount=int(data.amount),
@@ -94,7 +107,10 @@ def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    order = db.query(Order).options(joinedload(Order.user)).filter(
+    order = db.query(Order).options(
+        joinedload(Order.user),
+        selectinload(Order.items)
+    ).filter(
         Order.razorpay_order_id == payload["razorpay_order_id"]
     ).first()
 
@@ -110,10 +126,15 @@ def verify_payment(
     db.commit()
     db.refresh(order)
 
-
     user_phone = order.user.phone
+    book_titles = ", ".join([item.title for item in order.items])
 
-    send_user_order_confirmed(user_phone, order.id)
+    send_user_order_confirmed(
+        user_phone,
+        order.id,
+        order.total_amount,
+        book_titles
+    )
 
     return {
         "message": "Payment successful",
@@ -147,7 +168,7 @@ def get_my_orders(
                 "quantity": item.quantity
             }
             for item in order.items
-            if item.order_id == order.id   # CRITICAL FIX
+            if item.order_id == order.id
         ]
 
         result.append({
@@ -194,7 +215,7 @@ def get_all_orders(
                 "quantity": item.quantity
             }
             for item in order.items
-            if item.order_id == order.id   # CRITICAL FIX
+            if item.order_id == order.id
         ]
 
         result.append({
@@ -222,6 +243,8 @@ def get_all_orders(
 
     return result
 
+
+# ---------------- UPDATE STATUS ----------------
 @router.put("/update-status/{order_id}")
 def update_order_status(
     order_id: int,
@@ -229,7 +252,13 @@ def update_order_status(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin_user)
 ):
-    order = db.query(Order).filter(Order.id == order_id).first()
+
+    order = db.query(Order).options(
+        joinedload(Order.user),
+        selectinload(Order.items)
+    ).filter(
+        Order.id == order_id
+    ).first()
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -237,8 +266,6 @@ def update_order_status(
     status = payload.get("status")
 
     order.status = status
-
-    from datetime import datetime
 
     if status == "confirmed":
         order.confirmed_at = datetime.utcnow()
@@ -255,6 +282,30 @@ def update_order_status(
     db.commit()
     db.refresh(order)
 
+    user_phone = order.user.phone
+    book_titles = ", ".join([item.title for item in order.items])
+
+    if status == "packed":
+        send_user_order_packed(
+            user_phone,
+            order.id,
+            book_titles
+        )
+
+    elif status == "shipped":
+        send_user_order_shipped(
+            user_phone,
+            order.id,
+            book_titles
+        )
+
+    elif status == "delivered":
+        send_user_order_delivered(
+            user_phone,
+            order.id,
+            book_titles
+        )
+
     return {"message": "Status updated"}
 
 
@@ -265,6 +316,7 @@ def get_order(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
+
     order = (
         db.query(Order)
         .options(selectinload(Order.items))
@@ -286,7 +338,7 @@ def get_order(
             "quantity": item.quantity
         }
         for item in order.items
-        if item.order_id == order.id   # CRITICAL FIX
+        if item.order_id == order.id
     ]
 
     return {
