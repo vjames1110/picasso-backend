@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,10 +23,35 @@ def create_book(data: BookCreate, db: Session = Depends(get_db)):
 
 # Get All Books
 
+from fastapi import Query
+from sqlalchemy import or_
+
 @router.get("", response_model=list[BookResponse])
 @router.get("/", response_model=list[BookResponse])
-def get_books(db: Session = Depends(get_db)):
-    books = db.query(Book).all()
+def get_books(
+    search: str = Query(None),
+    category: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Book)
+
+    # search filter
+    if search:
+        search_term = f"%{search.lower()}%"
+
+        query = query.filter(
+            or_(
+                Book.title.ilike(search_term),
+                Book.category.ilike(search_term),
+                Book.author.any(search_term)
+            )
+        )
+
+    # category filter
+    if category:
+        query = query.filter(Book.category.ilike(f"%{category}%"))
+
+    books = query.all()
     return books
 
 # Get Single Book
