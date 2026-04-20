@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.models.book import Book
@@ -8,8 +9,7 @@ from app.schemas.book import BookCreate, BookResponse
 router = APIRouter(prefix="/books", tags=["books"])
 
 
-# Create Book
-
+# ---------------- CREATE BOOK ----------------
 @router.post("", response_model=BookResponse)
 @router.post("/", response_model=BookResponse)
 def create_book(data: BookCreate, db: Session = Depends(get_db)):
@@ -21,11 +21,8 @@ def create_book(data: BookCreate, db: Session = Depends(get_db)):
 
     return book
 
-# Get All Books
 
-from fastapi import Query
-from sqlalchemy import or_
-
+# ---------------- GET ALL BOOKS ----------------
 @router.get("", response_model=list[BookResponse])
 @router.get("/", response_model=list[BookResponse])
 def get_books(
@@ -33,7 +30,8 @@ def get_books(
     category: str = Query(None),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Book)
+    # IMPORTANT: only active books
+    query = db.query(Book).filter(Book.is_active == True)
 
     # search filter
     if search:
@@ -54,18 +52,23 @@ def get_books(
     books = query.all()
     return books
 
-# Get Single Book
 
+# ---------------- GET SINGLE BOOK ----------------
 @router.get("/{book_id}", response_model=BookResponse)
 def get_book(book_id: int, db: Session = Depends(get_db)):
-    book = db.query(Book).filter(Book.id == book_id).first()
+
+    book = db.query(Book).filter(
+        Book.id == book_id,
+        Book.is_active == True
+    ).first()
 
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    
+
     return book
 
-# Update Book
+
+# ---------------- UPDATE BOOK ----------------
 @router.put("/{book_id}", response_model=BookResponse)
 def update_book(book_id: int, data: BookCreate, db: Session = Depends(get_db)):
 
@@ -73,7 +76,7 @@ def update_book(book_id: int, data: BookCreate, db: Session = Depends(get_db)):
 
     if not book:
         raise HTTPException(status_code=404)
-    
+
     for key, value in data.dict().items():
         setattr(book, key, value)
 
@@ -82,7 +85,8 @@ def update_book(book_id: int, data: BookCreate, db: Session = Depends(get_db)):
 
     return book
 
-# Delete Book
+
+# ---------------- DELETE BOOK (SOFT DELETE) ----------------
 @router.delete("/{book_id}")
 def delete_book(book_id: int, db: Session = Depends(get_db)):
 
@@ -91,14 +95,9 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    try:
-        db.delete(book)
-        db.commit()
-        return {"message": "Book deleted successfully"}
+    # SOFT DELETE
+    book.is_active = False
 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot delete book. It is used in orders."
-        )
+    db.commit()
+
+    return {"message": "Book deleted successfully"}

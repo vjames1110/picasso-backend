@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY
 from datetime import datetime
 from app.core.database import Base
@@ -17,3 +17,5 @@ class Book(Base):
     author = Column(ARRAY(String))
     category = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    is_active = Column(Boolean, default=True)
