@@ -10,7 +10,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://picasso-publications.netlify.app"
+        "https://picasso-publications.netlify.app",
+        "https://www.picassopublications.com",
+        "https://picassopublications.com/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
