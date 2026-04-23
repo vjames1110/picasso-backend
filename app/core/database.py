@@ -1,15 +1,31 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+
+# ✅ Load .env
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    print("WARNING: DATABASE_URL not set")
+    raise ValueError("DATABASE_URL is not set")
+
+# Render Postgres SSL fix
+connect_args = {}
+
+if "render.com" in DATABASE_URL:
+    connect_args = {"sslmode": "require"}
+
+# SQLite fix (optional fallback)
+if "sqlite" in DATABASE_URL:
+    connect_args = {"check_same_thread": False}
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args=connect_args
 )
 
 SessionLocal = sessionmaker(
