@@ -53,13 +53,15 @@ def send_admin_new_order(order_id, amount, books):
 
 
 # ---------------- USER CONFIRMED ----------------
-def send_user_order_confirmed(phone, order_id, amount, books):
-
-    send_whatsapp_template(
-        phone,
-        "order_confirmed",
-        [order_id, amount, books]
+try:
+    send_user_order_confirmed(
+        user_phone,
+        order.id,
+        order.total_amount,
+        book_titles
     )
+except Exception as e:
+    print("WhatsApp Error (ignored):", str(e))
 
 
 # ---------------- USER PACKED ----------------
