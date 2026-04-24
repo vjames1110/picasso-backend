@@ -117,7 +117,9 @@ def verify_payment(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    order.status = "confirmed"
+    if order.status != "confirmed":
+        order.status = "confirmed"
+    
     order.payment_id = payload["razorpay_payment_id"]
 
     if not order.confirmed_at:
