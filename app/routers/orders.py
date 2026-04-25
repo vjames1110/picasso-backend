@@ -17,6 +17,14 @@ from app.services.whatsapp import (
     send_user_order_delivered
 )
 
+from app.services.email import (
+    send_admin_new_order_email,
+    send_user_confirmed_email,
+    send_user_packed_email,
+    send_user_shipped_email,
+    send_user_delivered_email
+)
+
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
@@ -68,6 +76,12 @@ def create_order(
     book_titles = ", ".join([item.title for item in items])
 
     send_admin_new_order(
+        order.id,
+        data.amount,
+        book_titles
+    )
+
+    send_admin_new_order_email(
         order.id,
         data.amount,
         book_titles
@@ -133,6 +147,13 @@ def verify_payment(
 
     send_user_order_confirmed(
         user_phone,
+        order.id,
+        order.total_amount,
+        book_titles
+    )
+
+    send_user_confirmed_email(
+        order.user.email,
         order.id,
         order.total_amount,
         book_titles
@@ -293,6 +314,11 @@ def update_order_status(
             order.id,
             book_titles
         )
+        send_user_packed_email(
+            order.user.email,
+            order.id,
+            book_titles
+        )
 
     elif status == "shipped":
         send_user_order_shipped(
@@ -300,10 +326,20 @@ def update_order_status(
             order.id,
             book_titles
         )
+        send_user_shipped_email(
+            order.user.email,
+            order.id,
+            book_titles
+        )
 
     elif status == "delivered":
         send_user_order_delivered(
             user_phone,
+            order.id,
+            book_titles
+        )
+        send_user_delivered_email(
+            order.user.email,
             order.id,
             book_titles
         )
