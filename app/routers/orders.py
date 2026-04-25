@@ -72,8 +72,7 @@ def create_order(
     db.commit()
     db.refresh(order)
 
-    # ⚠️ FIX: removed admin notification before payment
-
+    # Create Razorpay Order ONLY
     razorpay_order = create_razorpay_order(
         amount=int(data.amount),
         receipt_id=str(order.id)
@@ -118,9 +117,8 @@ def verify_payment(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.status != "confirmed":
-        order.status = "confirmed"
-    
+    # mark confirmed
+    order.status = "confirmed"
     order.payment_id = payload["razorpay_payment_id"]
 
     if not order.confirmed_at:
@@ -129,10 +127,12 @@ def verify_payment(
     db.commit()
     db.refresh(order)
 
+    # Prepare data
     user_phone = order.user.phone
+    user_email = order.user.email
     book_titles = ", ".join([item.title for item in order.items])
 
-    # ✅ ADMIN NOTIFICATION AFTER PAYMENT SUCCESS
+    # ---------- ADMIN NOTIFICATION ----------
     send_admin_new_order(
         order.id,
         order.total_amount,
@@ -145,7 +145,7 @@ def verify_payment(
         book_titles
     )
 
-    # ✅ USER CONFIRMATION
+    # ---------- USER CONFIRMATION ----------
     send_user_order_confirmed(
         user_phone,
         order.id,
@@ -154,7 +154,7 @@ def verify_payment(
     )
 
     send_user_confirmed_email(
-        order.user.email,
+        user_email,
         order.id,
         order.total_amount,
         book_titles
@@ -163,4 +163,202 @@ def verify_payment(
     return {
         "message": "Payment successful",
         "order_id": order.id
+    }
+
+
+# ---------------- MY ORDERS ----------------
+@router.get("/my-orders")
+def get_my_orders(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    orders = (
+        db.query(Order)
+        .options(selectinload(Order.items))
+        .filter(Order.user_id == user.id)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for order in orders:
+
+        items = [
+            {
+                "book_id": item.book_id,
+                "title": item.title,
+                "price": item.price,
+                "quantity": item.quantity
+            }
+            for item in order.items
+        ]
+
+        result.append({
+            "id": order.id,
+            "status": order.status,
+            "total_amount": order.total_amount,
+            "payment_id": order.payment_id,
+            "created_at": order.created_at,
+            "confirmed_at": order.confirmed_at,
+            "packed_at": order.packed_at,
+            "shipped_at": order.shipped_at,
+            "delivered_at": order.delivered_at,
+            "items": items
+        })
+
+    return result
+
+
+# ---------------- ADMIN ALL ORDERS ----------------
+@router.get("/admin/all")
+def get_all_orders(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_admin_user)
+):
+    orders = (
+        db.query(Order)
+        .options(
+            selectinload(Order.items),
+            joinedload(Order.user)
+        )
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for order in orders:
+
+        items = [
+            {
+                "book_id": item.book_id,
+                "title": item.title,
+                "price": item.price,
+                "quantity": item.quantity
+            }
+            for item in order.items
+        ]
+
+        result.append({
+            "id": order.id,
+            "status": order.status,
+            "total_amount": order.total_amount,
+            "payment_id": order.payment_id,
+            "created_at": order.created_at,
+            "confirmed_at": order.confirmed_at,
+            "packed_at": order.packed_at,
+            "shipped_at": order.shipped_at,
+            "delivered_at": order.delivered_at,
+            "user": {
+                "name": order.user.name,
+                "email": order.user.email,
+                "phone": order.user.phone,
+                "pincode": order.user.pincode,
+                "house": order.user.house,
+                "area": order.user.area,
+                "city": order.user.city,
+                "state": order.user.state
+            },
+            "items": items
+        })
+
+    return result
+
+
+# ---------------- UPDATE STATUS ----------------
+@router.put("/update-status/{order_id}")
+def update_order_status(
+    order_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin_user)
+):
+
+    order = db.query(Order).options(
+        joinedload(Order.user),
+        selectinload(Order.items)
+    ).filter(
+        Order.id == order_id
+    ).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    status = payload.get("status")
+    order.status = status
+
+    if status == "packed":
+        order.packed_at = datetime.utcnow()
+
+    elif status == "shipped":
+        order.shipped_at = datetime.utcnow()
+
+    elif status == "delivered":
+        order.delivered_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(order)
+
+    user_phone = order.user.phone
+    user_email = order.user.email
+    book_titles = ", ".join([item.title for item in order.items])
+
+    if status == "packed":
+        send_user_order_packed(user_phone, order.id, book_titles)
+        send_user_packed_email(user_email, order.id, book_titles)
+
+    elif status == "shipped":
+        send_user_order_shipped(user_phone, order.id, book_titles)
+        send_user_shipped_email(user_email, order.id, book_titles)
+
+    elif status == "delivered":
+        send_user_order_delivered(user_phone, order.id, book_titles)
+        send_user_delivered_email(user_email, order.id, book_titles)
+
+    return {"message": "Status updated"}
+
+
+# ---------------- GET SINGLE ORDER ----------------
+@router.get("/{order_id}")
+def get_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+
+    order = (
+        db.query(Order)
+        .options(selectinload(Order.items))
+        .filter(
+            Order.id == order_id,
+            Order.user_id == user.id
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items = [
+        {
+            "book_id": item.book_id,
+            "title": item.title,
+            "price": item.price,
+            "quantity": item.quantity
+        }
+        for item in order.items
+    ]
+
+    return {
+        "id": order.id,
+        "status": order.status,
+        "total_amount": order.total_amount,
+        "payment_id": order.payment_id,
+        "created_at": order.created_at,
+        "confirmed_at": order.confirmed_at,
+        "packed_at": order.packed_at,
+        "shipped_at": order.shipped_at,
+        "delivered_at": order.delivered_at,
+        "items": items
     }
