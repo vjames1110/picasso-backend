@@ -65,25 +65,17 @@ def seo_book(book_id: int):
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:type" content="product" />
-<meta property="og:url" content="https://picassopublications.com/book/{book.id}" />
-
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="{book.title}" />
-<meta name="twitter:description" content="Buy {book.title}" />
-<meta name="twitter:image" content="{book.image}" />
-
-<meta name="robots" content="index, follow">
 
 <script>
-setTimeout(function() {{
-window.location.href = "https://picassopublications.com/book/{book.id}";
-}}, 1200);
+if(!window.location.search.includes("redirected=true")){{
+window.location.href =
+"https://picassopublications.com/book/{book.id}?redirected=true";
+}}
 </script>
 
 </head>
-
 <body>
-<p>Redirecting to book page...</p>
+Redirecting...
 </body>
 </html>
 """
