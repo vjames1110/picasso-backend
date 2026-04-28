@@ -23,8 +23,11 @@ if "sqlite" in DATABASE_URL:
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=40,
+    pool_timeout=60,
     pool_recycle=300,
+    pool_pre_ping=True,
     connect_args=connect_args
 )
 
