@@ -1,3 +1,5 @@
+from curses import window
+
 from fastapi import FastAPI
 from app.core.database import Base, engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,6 +56,9 @@ def seo_book(book_id: int):
 <meta property="og:title" content="{book.title}" />
 <meta property="og:description" content="Buy {book.title} at ₹{book.price}" />
 <meta property="og:image" content="{book.image}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
 <meta property="og:url" content="https://picassopublications.com/book/{book.id}" />
 <meta property="og:type" content="product" />
 
