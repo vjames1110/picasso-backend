@@ -1,15 +1,13 @@
-from curses import window
-
 from fastapi import FastAPI
 from app.core.database import Base, engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, books, cart, wishlist, orders, admin_dashboard
 
-app = FastAPI()
-
 from fastapi.responses import HTMLResponse
 from app.models.book import Book
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,17 +35,25 @@ app.include_router(
 
 Base.metadata.create_all(bind=engine)
 
-# ✅ SEO SHARE ROUTE
+
+# ✅ HEALTH CHECK (for uptime robot)
+@app.get("/")
+def health():
+    return {"status": "ok"}
+
+
+# ✅ SEO SHARE ROUTE (FIXED DB LEAK)
 @app.get("/seo/book/{book_id}", response_class=HTMLResponse)
 def seo_book(book_id: int):
 
     db = SessionLocal()
-    book = db.query(Book).filter(Book.id == book_id).first()
+    try:
+        book = db.query(Book).filter(Book.id == book_id).first()
 
-    if not book:
-        return HTMLResponse("<h1>Book not found</h1>", status_code=404)
+        if not book:
+            return HTMLResponse("<h1>Book not found</h1>", status_code=404)
 
-    html = f"""
+        html = f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -79,11 +85,13 @@ window.location.replace("https://picassopublications.com/book/{book.id}");
 
 </html>
 """
+        return HTMLResponse(
+            content=html,
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Robots-Tag": "index, follow"
+            }
+        )
 
-    return HTMLResponse(
-        content=html,
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Robots-Tag": "index, follow"
-        }
-    )
+    finally:
+        db.close()
