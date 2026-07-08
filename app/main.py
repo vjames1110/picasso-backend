@@ -1,6 +1,10 @@
+import logging
+from html import escape
+
 from fastapi import FastAPI
 from app.core.database import Base, engine, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import OperationalError
 
 from app.routers import auth, books, cart, wishlist, orders, admin_dashboard
 
@@ -13,6 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "https://picasso-publications.netlify.app",
         "https://www.picassopublications.com",
         "https://picassopublications.com"
@@ -33,7 +38,15 @@ app.include_router(
     tags=["Admin Dashboard"]
 )
 
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+def create_tables():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except OperationalError as exc:
+        logger.warning("Skipping database initialization on startup: %s", exc)
 
 
 # ✅ HEALTH CHECK (for uptime robot)
@@ -48,20 +61,22 @@ def seo_book(book_id: int):
 
     db = SessionLocal()
     try:
-        book = db.query(Book).filter(Book.id == book_id).first()
+        book = db.query(Book).filter(Book.id == book_id, Book.is_active == True).first()
 
         if not book:
             return HTMLResponse("<h1>Book not found</h1>", status_code=404)
 
+        title = escape(book.title or "Picasso Publications", quote=True)
+        image = escape(book.image or "", quote=True)
         html = f"""
 <!DOCTYPE html>
 <html>
 <head>
-<title>{book.title}</title>
+<title>{title}</title>
 
-<meta property="og:title" content="{book.title}" />
-<meta property="og:description" content="Buy {book.title} at ₹{book.price}" />
-<meta property="og:image" content="{book.image}" />
+<meta property="og:title" content="{title}" />
+<meta property="og:description" content="Buy {title} at Rs. {book.price}" />
+<meta property="og:image" content="{image}" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:type" content="product" />

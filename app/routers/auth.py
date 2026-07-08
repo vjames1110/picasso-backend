@@ -12,10 +12,8 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/send-otp")
 def send_otp(data: SendOTP):
-    otp = generate_otp(data.email)
-    # In a real application, you would send the OTP via SMS here
-    return {"message": "OTP sent to email",
-            "otp": otp}  # For testing purposes, we return the OTP in the response
+    generate_otp(data.email)
+    return {"message": "OTP sent to email"}
 
 @router.post("/verify-otp")
 def verify(data: VerifyOTP, db: Session = Depends(get_db)):
@@ -43,6 +41,7 @@ def verify(data: VerifyOTP, db: Session = Depends(get_db)):
 @router.get("/me")
 def get_me(user=Depends(get_current_user)):
     return {"id": user.id,
+            "email": user.email,
             "phone": user.phone}
 
 @router.put("/address")

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import String, cast, or_, func
 
 from app.core.database import get_db
 from app.models.book import Book
+from app.models.order import OrderItem
 from app.schemas.book import BookCreate, BookResponse
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -41,7 +42,7 @@ def get_books(
             or_(
                 Book.title.ilike(search_term),
                 Book.category.ilike(search_term),
-                Book.author.any(search_term)
+                cast(Book.author, String).ilike(search_term)
             )
         )
 
@@ -49,8 +50,25 @@ def get_books(
     if category:
         query = query.filter(Book.category.ilike(f"%{category}%"))
 
-    books = query.all()
+    books = query.order_by(Book.created_at.desc(), Book.id.desc()).all()
     return books
+
+
+# ---------------- TOP SELLING BOOKS ----------------
+@router.get("/top-selling", response_model=list[BookResponse])
+def get_top_selling_books(
+    limit: int = Query(8, ge=1, le=24),
+    db: Session = Depends(get_db)
+):
+    return (
+        db.query(Book)
+        .outerjoin(OrderItem, OrderItem.book_id == Book.id)
+        .filter(Book.is_active == True)
+        .group_by(Book.id)
+        .order_by(func.coalesce(func.sum(OrderItem.quantity), 0).desc(), Book.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 # ---------------- GET SINGLE BOOK ----------------

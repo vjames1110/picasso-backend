@@ -1,13 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CartCreate(BaseModel):
     book_id: int
-    quantity: int
+    quantity: int = Field(ge=1)
 
 
 class CartUpdate(BaseModel):
-    quantity: int
+    quantity: int = Field(ge=1)
 
 
 class CartResponse(BaseModel):

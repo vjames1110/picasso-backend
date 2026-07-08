@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.cart import Cart
@@ -16,10 +16,16 @@ def add_to_cart(data: CartCreate,
                 user = Depends(get_current_user)):
     
     # Check Book
-    book = db.query(Book).filter(Book.id == data.book_id).first()
+    book = db.query(Book).filter(
+        Book.id == data.book_id,
+        Book.is_active == True
+    ).first()
 
     if not book:
-        return {"error": "Book Not Found"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    if book.stock < 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Book is out of stock")
     
     # Check existing cart item
 
@@ -61,18 +67,16 @@ def get_cart(
     user = Depends(get_current_user)
 ):
 
-    items = db.query(Cart).filter(
-        Cart.user_id == user.id
-    ).all()
+    rows = (
+        db.query(Cart, Book)
+        .join(Book, Book.id == Cart.book_id)
+        .filter(Cart.user_id == user.id, Book.is_active == True)
+        .order_by(Cart.id.desc())
+        .all()
+    )
 
-    result = []
-
-    for item in items:
-        book = db.query(Book).filter(
-            Book.id == item.book_id
-        ).first()
-
-        result.append({
+    return [
+        {
             "id": item.id,
             "book_id": item.book_id,
             "quantity": item.quantity,
@@ -81,9 +85,9 @@ def get_cart(
             "originalPrice": book.original_price,
             "image": book.image,
             "stock": book.stock
-        })
-
-    return result
+        }
+        for item, book in rows
+    ]
 
 
 # Update cart
@@ -101,11 +105,18 @@ def update_cart(
     ).first()
 
     if not item:
-        return {"error": "Item not found"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
 
     book = db.query(Book).filter(
-        Book.id == item.book_id
+        Book.id == item.book_id,
+        Book.is_active == True
     ).first()
+
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    if book.stock < 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Book is out of stock")
 
     qty = data.quantity
 
