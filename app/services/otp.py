@@ -2,12 +2,15 @@ import logging
 import os
 import random
 import threading
-import time
+from datetime import datetime, timedelta
 
 import requests
+from sqlalchemy.orm import Session
 
-OTP_STORE = {}
+from app.models.otp import OtpCode
+
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+OTP_TTL_SECONDS = 600
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +39,7 @@ def send_email_otp(email: str, otp: str):
                     "htmlContent": (
                         "<h2>Picasso Publications</h2>"
                         f"<h1>{otp}</h1>"
-                        "<p>This OTP is valid for 5 minutes.</p>"
+                        "<p>This OTP is valid for 10 minutes.</p>"
                     ),
                 },
                 timeout=15,
@@ -48,23 +51,34 @@ def send_email_otp(email: str, otp: str):
     threading.Thread(target=send, daemon=True).start()
 
 
-def generate_otp(email: str):
+def generate_otp(db: Session, email: str):
     otp = str(random.randint(100000, 999999))
-    OTP_STORE[email] = {"otp": otp, "time": time.time()}
+    expires_at = datetime.utcnow() + timedelta(seconds=OTP_TTL_SECONDS)
+
+    record = db.query(OtpCode).filter(OtpCode.email == email).first()
+    if record:
+        record.otp = otp
+        record.expires_at = expires_at
+    else:
+        db.add(OtpCode(email=email, otp=otp, expires_at=expires_at))
+    db.commit()
+
     send_email_otp(email, otp)
 
 
-def verify_otp(email: str, otp: str):
-    data = OTP_STORE.get(email)
-    if not data:
+def verify_otp(db: Session, email: str, otp: str):
+    record = db.query(OtpCode).filter(OtpCode.email == email).first()
+    if not record:
         return False
 
-    if time.time() - data["time"] > 300:
-        del OTP_STORE[email]
+    if datetime.utcnow() > record.expires_at:
+        db.delete(record)
+        db.commit()
         return False
 
-    if data["otp"] == otp:
-        del OTP_STORE[email]
+    if record.otp == otp:
+        db.delete(record)
+        db.commit()
         return True
 
     return False

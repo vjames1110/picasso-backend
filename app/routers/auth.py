@@ -11,13 +11,13 @@ from app.services.deps import get_current_user
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/send-otp")
-def send_otp(data: SendOTP):
-    generate_otp(data.email)
+def send_otp(data: SendOTP, db: Session = Depends(get_db)):
+    generate_otp(db, data.email)
     return {"message": "OTP sent to email"}
 
 @router.post("/verify-otp")
 def verify(data: VerifyOTP, db: Session = Depends(get_db)):
-    is_valid = verify_otp(data.email, data.otp)
+    is_valid = verify_otp(db, data.email, data.otp)
 
     if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid OTP")
@@ -50,10 +50,16 @@ def update_address(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    phone_owner = db.query(User).filter(
+        User.phone == data.phone,
+        User.id != user.id
+    ).first()
+
+    if phone_owner:
+        raise HTTPException(status_code=409, detail="Phone number is already registered")
 
     user.name = data.name
     user.phone = data.phone
-    user.email = data.email
     user.pincode = data.pincode
     user.house = data.house
     user.area = data.area
